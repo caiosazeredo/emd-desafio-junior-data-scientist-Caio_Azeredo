@@ -96,8 +96,8 @@ LIMIT 1;
 WITH EventosDias AS (
     SELECT 
         evento,
-        MIN(data_inicial) as data_inicial,
-        MAX(data_final) as data_final,
+        MIN(data_inicial) AS data_inicial,
+        MAX(data_final) AS data_final,
         SUM(DATE_DIFF(data_final, data_inicial, DAY) + 1) AS duracao_evento
     FROM 
         datario.turismo_fluxo_visitantes.rede_hoteleira_ocupacao_eventos
@@ -108,29 +108,36 @@ WITH EventosDias AS (
 ChamadosDuranteEventos AS (
     SELECT 
         e.evento,
-        COUNT(c.id_chamado) AS chamados
+        COUNT(c.id_chamado) AS chamados,
+        e.duracao_evento
     FROM 
         EventosDias e
     JOIN 
         datario.administracao_servicos_publicos.chamado_1746 c 
         ON c.data_inicio >= e.data_inicial AND c.data_inicio <= e.data_final
         AND c.subtipo = 'Perturbação do sossego'
-    GROUP BY e.evento
+    GROUP BY e.evento, e.duracao_evento
+),
+MediaTotalChamados AS (
+    SELECT 
+        'Média Total de Chamados 2022/2023' AS descricao,
+        COUNT(*) * 1.0 / (DATE_DIFF(DATE '2023-12-31', DATE '2022-01-01', DAY) + 1) AS media_diaria_periodo
+    FROM 
+        datario.administracao_servicos_publicos.chamado_1746
+    WHERE 
+        subtipo = 'Perturbação do sossego'
+        AND data_inicio BETWEEN '2022-01-01' AND '2023-12-31'
 )
 SELECT 
-    e.evento,
-    ce.chamados / e.duracao_evento AS media_diaria_evento
+    evento AS Nome,
+    'Evento Específico' AS Tipo,
+    chamados / duracao_evento AS Valor
 FROM 
-    EventosDias e
-JOIN 
-    ChamadosDuranteEventos ce ON e.evento = ce.evento;
-
-
+    ChamadosDuranteEventos
+UNION ALL
 SELECT 
-    'Média Total de chamados 2022/2023' AS descricao,
-    COUNT(*) / (DATE_DIFF('2023-12-31', '2022-01-01', DAY) + 1) AS media_diaria_periodo
+    descricao AS Nome,
+    'Média Período' AS Tipo,
+    media_diaria_periodo AS Valor
 FROM 
-    datario.administracao_servicos_publicos.chamado_1746
-WHERE 
-    subtipo = 'Perturbação do sossego'
-    AND data_inicio BETWEEN '2022-01-01' AND '2023-12-31';
+    MediaTotalChamados;
